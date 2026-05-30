@@ -94,8 +94,8 @@ export const Route = createFileRoute("/frameworks/$slug")({
 });
 
 function FrameworkPage() {
-  const f = Route.useLoaderData();
-  const statusColor = { PASS: "text-primary", WARN: "text-yellow-400", FAIL: "text-destructive" };
+  const f = Route.useLoaderData() as FrameworkData;
+  const statusColor: Record<"PASS" | "WARN" | "FAIL", string> = { PASS: "text-primary", WARN: "text-yellow-400", FAIL: "text-destructive" };
   const others = Object.values(FRAMEWORKS).filter((x) => x.slug !== f.slug);
 
   return (
