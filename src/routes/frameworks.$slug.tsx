@@ -61,7 +61,7 @@ const FRAMEWORKS: Record<string, FrameworkData> = {
 };
 
 export const Route = createFileRoute("/frameworks/$slug")({
-  loader: ({ params }) => {
+  loader: ({ params }): FrameworkData => {
     const f = FRAMEWORKS[params.slug];
     if (!f) throw notFound();
     return f;
