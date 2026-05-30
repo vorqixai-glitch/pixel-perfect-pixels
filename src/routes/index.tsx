@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -31,17 +31,18 @@ function Nav() {
   return (
     <nav className="sticky top-0 z-50 bg-background/85 backdrop-blur-md border-b border-border">
       <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
-        <a href="/" className="font-display text-2xl tracking-tighter uppercase">
+        <Link to="/" className="font-display text-2xl tracking-tighter uppercase">
           Scanr<span className="text-primary">.</span>
-        </a>
+        </Link>
         <div className="hidden md:flex gap-8 font-mono text-xs uppercase tracking-widest">
           <a href="#engine" className="hover:text-primary transition-colors">Engine</a>
           <a href="#frameworks" className="hover:text-primary transition-colors">Frameworks</a>
           <a href="#pricing" className="hover:text-primary transition-colors">Pricing</a>
+          <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
         </div>
-        <button className="bg-primary text-primary-foreground px-5 py-2 text-xs font-mono uppercase tracking-tighter hover:brightness-110 transition-all">
+        <Link to="/scan" className="bg-primary text-primary-foreground px-5 py-2 text-xs font-mono uppercase tracking-tighter hover:brightness-110 transition-all">
           Deploy Scan
-        </button>
+        </Link>
       </div>
     </nav>
   );
@@ -69,7 +70,7 @@ function Hero() {
 
 function DashboardMock() {
   return (
-    <div className="relative animate-reveal [animation-delay:400ms] ring-1 ring-border rounded-xl overflow-hidden bg-card">
+    <Link to="/scan" className="block group relative animate-reveal [animation-delay:400ms] ring-1 ring-border rounded-xl overflow-hidden bg-card hover:ring-primary transition-all">
       <div className="h-10 border-b border-border px-4 flex items-center gap-3">
         <div className="flex gap-1.5">
           <div className="size-2.5 rounded-full bg-foreground/15" />
@@ -78,6 +79,9 @@ function DashboardMock() {
         </div>
         <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
           scanr ~ prod-cluster-01 ~ live
+        </div>
+        <div className="ml-auto font-mono text-[10px] uppercase tracking-widest text-primary opacity-0 group-hover:opacity-100 transition-opacity">
+          Open engine →
         </div>
       </div>
       <div className="grid md:grid-cols-[1fr_1.2fr] gap-px bg-border">
@@ -126,7 +130,7 @@ function DashboardMock() {
           </div>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -149,22 +153,27 @@ function Marquee() {
 
 function Frameworks() {
   const fws = [
-    { n: "01 / SOC 2", t: "Continuous Audit", d: "Real-time technical evidence collection across AWS, GCP, and Azure environments." },
-    { n: "02 / HIPAA", t: "PHI Guard", d: "Automated encryption checks and access log verification for sensitive health data." },
-    { n: "03 / GDPR", t: "Data Sovereignty", d: "Map data residency and cross-border transfers to ensure strict EU regulatory alignment." },
+    { slug: "soc2", n: "01 / SOC 2", t: "Continuous Audit", d: "Real-time technical evidence collection across AWS, GCP, and Azure environments." },
+    { slug: "hipaa", n: "02 / HIPAA", t: "PHI Guard", d: "Automated encryption checks and access log verification for sensitive health data." },
+    { slug: "gdpr", n: "03 / GDPR", t: "Data Sovereignty", d: "Map data residency and cross-border transfers to ensure strict EU regulatory alignment." },
   ];
   return (
     <section id="frameworks" className="py-24 px-6">
       <div className="max-w-7xl mx-auto">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-px bg-border border border-border">
           {fws.map((f) => (
-            <div key={f.n} className="bg-background p-12 group hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer">
+            <Link
+              key={f.slug}
+              to="/frameworks/$slug"
+              params={{ slug: f.slug }}
+              className="bg-background p-12 group hover:bg-primary hover:text-primary-foreground transition-colors cursor-pointer"
+            >
               <span className="font-mono text-xs text-primary group-hover:text-primary-foreground mb-8 block underline decoration-2 underline-offset-4">
                 {f.n}
               </span>
               <h3 className="font-display text-4xl uppercase mb-4 leading-none">{f.t}</h3>
               <p className="text-sm opacity-70 leading-relaxed">{f.d}</p>
-            </div>
+            </Link>
           ))}
         </div>
       </div>
@@ -230,9 +239,9 @@ function Pricing() {
               $499<span className="text-xl font-mono italic">/mo</span>
             </span>
           </div>
-          <button className="mt-4 w-full bg-background text-foreground font-display text-xl py-4 uppercase tracking-widest hover:bg-foreground hover:text-primary transition-colors">
+          <Link to="/contact" className="mt-4 w-full bg-background text-foreground font-display text-xl py-4 uppercase tracking-widest hover:bg-foreground hover:text-primary transition-colors text-center">
             Get Protected Now
-          </button>
+          </Link>
         </div>
       </div>
     </section>
@@ -249,9 +258,9 @@ function CTA() {
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mt-8">
           No credit card required · SOC 2 Type II report available
         </p>
-        <button className="mt-10 bg-primary text-primary-foreground font-display text-2xl px-12 py-5 uppercase tracking-widest hover:brightness-110 transition-all">
+        <Link to="/scan" className="inline-block mt-10 bg-primary text-primary-foreground font-display text-2xl px-12 py-5 uppercase tracking-widest hover:brightness-110 transition-all">
           Start Free Scan →
-        </button>
+        </Link>
       </div>
     </section>
   );
@@ -266,9 +275,9 @@ function Footer() {
           <span>© 2026 Scanr Compliance Orchestration · Build 82.02.11</span>
         </div>
         <div className="flex gap-8">
-          <a href="#" className="hover:text-primary transition-colors">Privacy</a>
-          <a href="#" className="hover:text-primary transition-colors">Terms</a>
-          <a href="#" className="hover:text-primary transition-colors">Security</a>
+          <Link to="/scan" className="hover:text-primary transition-colors">Scan</Link>
+          <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
+          <Link to="/frameworks/$slug" params={{ slug: "soc2" }} className="hover:text-primary transition-colors">Frameworks</Link>
         </div>
       </div>
     </footer>
