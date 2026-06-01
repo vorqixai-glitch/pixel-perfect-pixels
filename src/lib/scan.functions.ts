@@ -16,7 +16,7 @@ function nowStamp(offsetMs: number) {
   return d.toTimeString().slice(0, 8);
 }
 
-const CHECKS: Omit<Finding, "id" | "ts">[] = [
+export const CHECKS: Omit<Finding, "id" | "ts">[] = [
   { framework: "SOC 2", control: "CC6.1", severity: "SCAN", message: "Enumerating identity & access controls" },
   { framework: "SOC 2", control: "CC6.1", severity: "PASS", message: "MFA enforced on all admin accounts" },
   { framework: "PCI", control: "1.2.1", severity: "SCAN", message: "Inspecting perimeter security groups" },
