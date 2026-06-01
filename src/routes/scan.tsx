@@ -45,20 +45,53 @@ function nowStamp(offsetMs: number) {
   return d.toTimeString().slice(0, 8);
 }
 
+const TARGET_RE = /^([a-z0-9-]+\.)+[a-z]{2,}$|^[0-9]{12}$|^[a-zA-Z0-9_.-]{2,}$/i;
+
+function validateTarget(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return "Enter a domain, AWS account ID, or GitHub org to scan.";
+  if (t.length < 3) return "Target is too short — must be at least 3 characters.";
+  if (t.length > 253) return "Target is too long.";
+  if (/\s/.test(t)) return "Target cannot contain spaces.";
+  if (!TARGET_RE.test(t)) return "Invalid format. Try a domain like acme.com, a 12-digit AWS account, or a GitHub org.";
+  return null;
+}
+
 function ScanPage() {
   const [target, setTarget] = useState("");
-  const [status, setStatus] = useState<"idle" | "running" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "validating" | "running" | "done" | "error">("idle");
   const [feed, setFeed] = useState<Finding[]>([]);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const start = useCallback(() => {
-    const t = target.trim() || "prod-cluster-01";
-    setFeed([
-      { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing handshake with ${t}` },
-    ]);
-    setProgress(0);
-    setStatus("running");
+    const err = validateTarget(target);
+    if (err) {
+      setValidationError(err);
+      setStatus("error");
+      setError(err);
+      return;
+    }
+    setValidationError(null);
+    setError(null);
+    const t = target.trim();
+    setStatus("validating");
+    // Brief "connecting" phase so users see handshake feedback
+    setTimeout(() => {
+      // Simulated connection failure for obviously unreachable targets
+      if (/^(localhost|127\.|0\.0\.0\.0)/i.test(t)) {
+        setStatus("error");
+        setError(`Unable to reach ${t} — connector handshake refused. Check the target is publicly resolvable and try again.`);
+        return;
+      }
+      setFeed([
+        { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing handshake with ${t}` },
+      ]);
+      setProgress(0);
+      setStatus("running");
+    }, 600);
   }, [target]);
 
   useEffect(() => {
@@ -113,6 +146,8 @@ function ScanPage() {
     setFeed([]);
     setProgress(0);
     setStatus("idle");
+    setError(null);
+    setValidationError(null);
   };
 
   const sevColor: Record<Severity, string> = {
@@ -139,8 +174,8 @@ function ScanPage() {
           <div className="ring-1 ring-border rounded-xl overflow-hidden bg-card">
             <div className="h-10 border-b border-border px-4 flex items-center gap-3">
               <div className="flex gap-1.5">
-                <div className="size-2.5 rounded-full bg-foreground/15" />
-                <div className="size-2.5 rounded-full bg-foreground/15" />
+                <div className={`size-2.5 rounded-full ${status === "error" ? "bg-destructive" : "bg-foreground/15"}`} />
+                <div className={`size-2.5 rounded-full ${status === "validating" ? "bg-yellow-400 animate-pulse" : "bg-foreground/15"}`} />
                 <div className={`size-2.5 rounded-full ${status === "running" ? "bg-primary animate-pulse" : status === "done" ? "bg-primary" : "bg-foreground/15"}`} />
               </div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -148,35 +183,78 @@ function ScanPage() {
               </div>
             </div>
 
-            <div className="p-6 border-b border-border flex flex-col md:flex-row gap-3">
-              <input
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-                placeholder="domain.com  ·  aws-account-id  ·  github-org"
-                disabled={status === "running"}
-                className="flex-1 bg-background border border-border rounded px-4 py-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none focus:border-primary disabled:opacity-50"
-              />
-              {status !== "running" && status !== "done" && (
-                <button onClick={start} className="bg-primary text-primary-foreground px-6 py-3 font-mono text-xs uppercase tracking-widest hover:brightness-110 transition-all">
-                  Deploy Scan →
-                </button>
-              )}
-              {status === "running" && (
-                <button disabled className="bg-foreground/15 text-foreground px-6 py-3 font-mono text-xs uppercase tracking-widest">
-                  Scanning {progress}%
-                </button>
-              )}
-              {status === "done" && (
-                <>
-                  <button onClick={exportReport} className="bg-primary text-primary-foreground px-6 py-3 font-mono text-xs uppercase tracking-widest hover:brightness-110 transition-all">
-                    Export JSON
+            <div className="p-6 border-b border-border flex flex-col gap-3">
+              <div className="flex flex-col md:flex-row gap-3">
+                <div className="flex-1">
+                  <input
+                    value={target}
+                    onChange={(e) => {
+                      setTarget(e.target.value);
+                      if (validationError) setValidationError(null);
+                      if (status === "error") { setStatus("idle"); setError(null); }
+                    }}
+                    onKeyDown={(e) => { if (e.key === "Enter" && status !== "running" && status !== "validating") start(); }}
+                    placeholder="domain.com  ·  aws-account-id  ·  github-org"
+                    disabled={status === "running" || status === "validating"}
+                    aria-invalid={!!validationError}
+                    aria-describedby={validationError ? "target-error" : undefined}
+                    className={`w-full bg-background border rounded px-4 py-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 ${validationError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"}`}
+                  />
+                  {validationError && (
+                    <p id="target-error" role="alert" className="mt-2 font-mono text-[11px] text-destructive">
+                      ✕ {validationError}
+                    </p>
+                  )}
+                </div>
+                {status === "idle" || status === "error" ? (
+                  <button onClick={start} className="bg-primary text-primary-foreground px-6 py-3 font-mono text-xs uppercase tracking-widest hover:brightness-110 transition-all">
+                    Deploy Scan →
                   </button>
-                  <button onClick={reset} className="border border-border px-6 py-3 font-mono text-xs uppercase tracking-widest hover:bg-card transition-all">
-                    Reset
+                ) : null}
+                {status === "validating" && (
+                  <button disabled className="bg-foreground/15 text-foreground px-6 py-3 font-mono text-xs uppercase tracking-widest inline-flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-yellow-400 animate-pulse" />
+                    Connecting…
                   </button>
-                </>
+                )}
+                {status === "running" && (
+                  <button disabled className="bg-foreground/15 text-foreground px-6 py-3 font-mono text-xs uppercase tracking-widest inline-flex items-center gap-2">
+                    <span className="size-3 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+                    Scanning {progress}%
+                  </button>
+                )}
+                {status === "done" && (
+                  <>
+                    <button onClick={exportReport} className="bg-primary text-primary-foreground px-6 py-3 font-mono text-xs uppercase tracking-widest hover:brightness-110 transition-all">
+                      Export JSON
+                    </button>
+                    <button onClick={reset} className="border border-border px-6 py-3 font-mono text-xs uppercase tracking-widest hover:bg-card transition-all">
+                      Reset
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {status === "error" && error && !validationError && (
+                <div role="alert" className="border border-destructive/60 bg-destructive/10 rounded px-4 py-3 font-mono text-xs text-destructive flex items-start justify-between gap-4">
+                  <div>
+                    <div className="uppercase tracking-widest text-[10px] mb-1">Scan failed</div>
+                    <div className="text-destructive/90 normal-case">{error}</div>
+                  </div>
+                  <button onClick={start} className="shrink-0 border border-destructive/60 px-3 py-1.5 uppercase tracking-widest text-[10px] hover:bg-destructive/20 transition-all">
+                    Retry
+                  </button>
+                </div>
+              )}
+
+              {status === "validating" && (
+                <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-2">
+                  <span className="size-1.5 rounded-full bg-yellow-400 animate-pulse" />
+                  Validating target and establishing connector handshake…
+                </div>
               )}
             </div>
+
 
             <div className="grid md:grid-cols-[1fr_1.4fr] gap-px bg-border">
               <div className="bg-card p-10 space-y-8 min-h-[480px]">
