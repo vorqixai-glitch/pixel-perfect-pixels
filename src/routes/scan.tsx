@@ -45,20 +45,53 @@ function nowStamp(offsetMs: number) {
   return d.toTimeString().slice(0, 8);
 }
 
+const TARGET_RE = /^([a-z0-9-]+\.)+[a-z]{2,}$|^[0-9]{12}$|^[a-zA-Z0-9_.-]{2,}$/i;
+
+function validateTarget(raw: string): string | null {
+  const t = raw.trim();
+  if (!t) return "Enter a domain, AWS account ID, or GitHub org to scan.";
+  if (t.length < 3) return "Target is too short — must be at least 3 characters.";
+  if (t.length > 253) return "Target is too long.";
+  if (/\s/.test(t)) return "Target cannot contain spaces.";
+  if (!TARGET_RE.test(t)) return "Invalid format. Try a domain like acme.com, a 12-digit AWS account, or a GitHub org.";
+  return null;
+}
+
 function ScanPage() {
   const [target, setTarget] = useState("");
-  const [status, setStatus] = useState<"idle" | "running" | "done">("idle");
+  const [status, setStatus] = useState<"idle" | "validating" | "running" | "done" | "error">("idle");
   const [feed, setFeed] = useState<Finding[]>([]);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
   const start = useCallback(() => {
-    const t = target.trim() || "prod-cluster-01";
-    setFeed([
-      { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing handshake with ${t}` },
-    ]);
-    setProgress(0);
-    setStatus("running");
+    const err = validateTarget(target);
+    if (err) {
+      setValidationError(err);
+      setStatus("error");
+      setError(err);
+      return;
+    }
+    setValidationError(null);
+    setError(null);
+    const t = target.trim();
+    setStatus("validating");
+    // Brief "connecting" phase so users see handshake feedback
+    setTimeout(() => {
+      // Simulated connection failure for obviously unreachable targets
+      if (/^(localhost|127\.|0\.0\.0\.0)/i.test(t)) {
+        setStatus("error");
+        setError(`Unable to reach ${t} — connector handshake refused. Check the target is publicly resolvable and try again.`);
+        return;
+      }
+      setFeed([
+        { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing handshake with ${t}` },
+      ]);
+      setProgress(0);
+      setStatus("running");
+    }, 600);
   }, [target]);
 
   useEffect(() => {
