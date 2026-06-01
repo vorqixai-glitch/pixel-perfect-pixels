@@ -146,6 +146,8 @@ function ScanPage() {
     setFeed([]);
     setProgress(0);
     setStatus("idle");
+    setError(null);
+    setValidationError(null);
   };
 
   const sevColor: Record<Severity, string> = {
