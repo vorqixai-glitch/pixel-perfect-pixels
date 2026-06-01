@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { runScan, type Finding, type Severity } from "@/lib/scan.functions";
 
 export const Route = createFileRoute("/scan")({
   head: () => ({
@@ -13,39 +14,8 @@ export const Route = createFileRoute("/scan")({
   component: ScanPage,
 });
 
-type Severity = "PASS" | "FAIL" | "WARN" | "SCAN" | "INIT" | "DONE";
-type Finding = {
-  id: string;
-  ts: string;
-  framework: "SOC 2" | "HIPAA" | "GDPR" | "PCI" | "ISO 27001";
-  control: string;
-  severity: Severity;
-  message: string;
-};
-
-const CHECKS: Omit<Finding, "id" | "ts">[] = [
-  { framework: "SOC 2", control: "CC6.1", severity: "SCAN", message: "Enumerating identity & access controls" },
-  { framework: "SOC 2", control: "CC6.1", severity: "PASS", message: "MFA enforced on all admin accounts" },
-  { framework: "PCI", control: "1.2.1", severity: "SCAN", message: "Inspecting perimeter security groups" },
-  { framework: "PCI", control: "1.2.1", severity: "FAIL", message: "SG-0822 inbound 0.0.0.0/0 open on :22" },
-  { framework: "HIPAA", control: "164.312(a)(2)(iv)", severity: "SCAN", message: "Verifying encryption at rest for PHI" },
-  { framework: "HIPAA", control: "164.312(a)(2)(iv)", severity: "PASS", message: "AES-256 confirmed on 184 buckets" },
-  { framework: "GDPR", control: "Art. 32", severity: "SCAN", message: "Mapping cross-border data residency" },
-  { framework: "GDPR", control: "Art. 32", severity: "WARN", message: "1 dataset replicated to us-east-1 without DPA" },
-  { framework: "SOC 2", control: "CC7.2", severity: "SCAN", message: "Reviewing system monitoring telemetry" },
-  { framework: "SOC 2", control: "CC7.2", severity: "PASS", message: "CloudTrail + GuardDuty active across 12 accounts" },
-  { framework: "ISO 27001", control: "A.12.4", severity: "SCAN", message: "Checking audit log retention" },
-  { framework: "ISO 27001", control: "A.12.4", severity: "PASS", message: "Logs retained 400d in immutable storage" },
-  { framework: "PCI", control: "8.3", severity: "SCAN", message: "Validating cardholder access MFA" },
-  { framework: "PCI", control: "8.3", severity: "FAIL", message: "2 service accounts bypass MFA policy" },
-];
-
-function nowStamp(offsetMs: number) {
-  const d = new Date(Date.now() + offsetMs);
-  return d.toTimeString().slice(0, 8);
-}
-
 const TARGET_RE = /^([a-z0-9-]+\.)+[a-z]{2,}$|^[0-9]{12}$|^[a-zA-Z0-9_.-]{2,}$/i;
+const SCAN_TIMEOUT_MS = 15000;
 
 function validateTarget(raw: string): string | null {
   const t = raw.trim();
@@ -57,68 +27,150 @@ function validateTarget(raw: string): string | null {
   return null;
 }
 
+type ScanErrorType = "timeout" | "network" | "service" | "validation" | "unknown";
+
+interface ScanError {
+  type: ScanErrorType;
+  message: string;
+  retryable: boolean;
+}
+
+function classifyError(err: unknown): ScanError {
+  const msg = err instanceof Error ? err.message : String(err);
+
+  if (msg.includes("timed out") || msg.includes("TIMEOUT") || msg.includes("AbortError") || msg.includes("timeout")) {
+    return { type: "timeout", message: "The scan engine timed out — the service may be overloaded or unreachable.", retryable: true };
+  }
+  if (msg.includes("temporarily unavailable") || msg.includes("#SRV-503") || msg.includes("unavailable")) {
+    return { type: "service", message: msg, retryable: true };
+  }
+  if (msg.includes("fetch") || msg.includes("network") || msg.includes("Failed to fetch") || msg.includes("Connection reset") || msg.includes("TLS handshake")) {
+    return { type: "network", message: "Network error — unable to reach the scan engine. Check your connection and try again.", retryable: true };
+  }
+  if (msg.includes("connector handshake refused") || msg.includes("localhost") || msg.includes("0.0.0.0")) {
+    return { type: "validation", message: msg, retryable: false };
+  }
+  return { type: "unknown", message: msg || "An unexpected error occurred during the scan.", retryable: true };
+}
+
 function ScanPage() {
   const [target, setTarget] = useState("");
   const [status, setStatus] = useState<"idle" | "validating" | "running" | "done" | "error">("idle");
   const [feed, setFeed] = useState<Finding[]>([]);
   const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  const [scanError, setScanError] = useState<ScanError | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const abortRef = useRef<AbortController | null>(null);
   const logRef = useRef<HTMLDivElement>(null);
 
-  const start = useCallback(() => {
+  const cleanup = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort();
+      abortRef.current = null;
+    }
+  }, []);
+
+  const runDemoScan = useCallback((t: string) => {
+    setDemoMode(true);
+    setScanError(null);
+    setValidationError(null);
+    setFeed([
+      { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing demo scan for ${t}` },
+    ]);
+    setProgress(0);
+    setStatus("running");
+  }, []);
+
+  const start = useCallback(async () => {
     const err = validateTarget(target);
     if (err) {
       setValidationError(err);
       setStatus("error");
-      setError(err);
+      setScanError({ type: "validation", message: err, retryable: false });
       return;
     }
     setValidationError(null);
-    setError(null);
+    setScanError(null);
+    setDemoMode(false);
+    setRetryCount(0);
     const t = target.trim();
+
     setStatus("validating");
-    // Brief "connecting" phase so users see handshake feedback
-    setTimeout(() => {
-      // Simulated connection failure for obviously unreachable targets
-      if (/^(localhost|127\.|0\.0\.0\.0)/i.test(t)) {
-        setStatus("error");
-        setError(`Unable to reach ${t} — connector handshake refused. Check the target is publicly resolvable and try again.`);
-        return;
+    cleanup();
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+    }, SCAN_TIMEOUT_MS);
+
+    try {
+      const result = await Promise.race([
+        runScan({ data: { target: t } }),
+        new Promise<never>((_, reject) => {
+          const timer = setTimeout(() => reject(new Error("TIMEOUT")), SCAN_TIMEOUT_MS);
+          controller.signal.addEventListener("abort", () => {
+            clearTimeout(timer);
+            reject(new Error("TIMEOUT"));
+          });
+        }),
+      ]);
+      clearTimeout(timeoutId);
+      if (controller.signal.aborted) {
+        throw new Error("TIMEOUT");
       }
+
       setFeed([
-        { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing handshake with ${t}` },
+        { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing handshake with ${result.target}` },
       ]);
       setProgress(0);
       setStatus("running");
-    }, 600);
-  }, [target]);
+    } catch (err) {
+      clearTimeout(timeoutId);
+      const classified = classifyError(err);
+      setScanError(classified);
+      setStatus("error");
+    }
+  }, [target, cleanup]);
+
+  const retry = useCallback(() => {
+    setRetryCount((c) => c + 1);
+    start();
+  }, [start]);
 
   useEffect(() => {
     if (status !== "running") return;
     let i = 0;
+    const allChecks = feed.length > 0 ? feed.slice(1) : [];
     const id = setInterval(() => {
-      if (i >= CHECKS.length) {
+      if (i >= allChecks.length) {
         setFeed((f) => [
           ...f,
-          { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "DONE", message: "Scan complete · report generated" },
+          { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "DONE", message: demoMode ? "Demo scan complete · report generated" : "Scan complete · report generated" },
         ]);
         setProgress(100);
         setStatus("done");
         clearInterval(id);
         return;
       }
-      const c = CHECKS[i];
+      const c = allChecks[i];
       setFeed((f) => [...f, { ...c, id: crypto.randomUUID(), ts: nowStamp(0) }]);
-      setProgress(Math.round(((i + 1) / CHECKS.length) * 100));
+      setProgress(Math.round(((i + 1) / allChecks.length) * 100));
       i++;
     }, 420);
     return () => clearInterval(id);
-  }, [status]);
+  }, [status, feed, demoMode]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
   }, [feed]);
+
+  useEffect(() => {
+    return () => cleanup();
+  }, [cleanup]);
 
   const summary = useMemo(() => {
     const pass = feed.filter((f) => f.severity === "PASS").length;
@@ -143,11 +195,14 @@ function ScanPage() {
   };
 
   const reset = () => {
+    cleanup();
     setFeed([]);
     setProgress(0);
     setStatus("idle");
-    setError(null);
+    setScanError(null);
     setValidationError(null);
+    setDemoMode(false);
+    setRetryCount(0);
   };
 
   const sevColor: Record<Severity, string> = {
@@ -179,7 +234,7 @@ function ScanPage() {
                 <div className={`size-2.5 rounded-full ${status === "running" ? "bg-primary animate-pulse" : status === "done" ? "bg-primary" : "bg-foreground/15"}`} />
               </div>
               <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">
-                scanr ~ {target || "prod-cluster-01"} ~ {status}
+                scanr ~ {target || "prod-cluster-01"} ~ {status}{demoMode ? " · demo" : ""}
               </div>
             </div>
 
@@ -191,13 +246,14 @@ function ScanPage() {
                     onChange={(e) => {
                       setTarget(e.target.value);
                       if (validationError) setValidationError(null);
-                      if (status === "error") { setStatus("idle"); setError(null); }
+                      if (status === "error") { setStatus("idle"); setScanError(null); }
                     }}
                     onKeyDown={(e) => { if (e.key === "Enter" && status !== "running" && status !== "validating") start(); }}
+                    onBlur={() => { if (validationError && !target.trim()) setValidationError(null); }}
                     placeholder="domain.com  ·  aws-account-id  ·  github-org"
                     disabled={status === "running" || status === "validating"}
                     aria-invalid={!!validationError}
-                    aria-describedby={validationError ? "target-error" : undefined}
+                    aria-describedby={validationError ? "target-error" : scanError ? "scan-error" : undefined}
                     className={`w-full bg-background border rounded px-4 py-3 font-mono text-sm placeholder:text-muted-foreground focus:outline-none disabled:opacity-50 ${validationError ? "border-destructive focus:border-destructive" : "border-border focus:border-primary"}`}
                   />
                   {validationError && (
@@ -235,15 +291,45 @@ function ScanPage() {
                 )}
               </div>
 
-              {status === "error" && error && !validationError && (
-                <div role="alert" className="border border-destructive/60 bg-destructive/10 rounded px-4 py-3 font-mono text-xs text-destructive flex items-start justify-between gap-4">
-                  <div>
-                    <div className="uppercase tracking-widest text-[10px] mb-1">Scan failed</div>
-                    <div className="text-destructive/90 normal-case">{error}</div>
+              {/* Error banner with fallback actions */}
+              {status === "error" && scanError && !validationError && (
+                <div
+                  id="scan-error"
+                  role="alert"
+                  className={`border rounded px-4 py-3 font-mono text-xs flex flex-col gap-3 ${
+                    scanError.type === "timeout" || scanError.type === "network"
+                      ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-400"
+                      : "border-destructive/60 bg-destructive/10 text-destructive"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="uppercase tracking-widest text-[10px] mb-1">
+                        {scanError.type === "timeout" ? "Connection timed out" :
+                         scanError.type === "network" ? "Network error" :
+                         scanError.type === "service" ? "Service unavailable" :
+                         "Scan failed"}
+                      </div>
+                      <div className="normal-case opacity-90">{scanError.message}</div>
+                    </div>
+                    {scanError.retryable && (
+                      <button onClick={retry} className="shrink-0 border border-current px-3 py-1.5 uppercase tracking-widest text-[10px] hover:bg-current/10 transition-all">
+                        Retry{retryCount > 0 ? ` (${retryCount})` : ""}
+                      </button>
+                    )}
                   </div>
-                  <button onClick={start} className="shrink-0 border border-destructive/60 px-3 py-1.5 uppercase tracking-widest text-[10px] hover:bg-destructive/20 transition-all">
-                    Retry
-                  </button>
+                  {/* Fallback: run demo scan */}
+                  <div className="border-t border-current/20 pt-2 flex items-center gap-3">
+                    <span className="text-[10px] uppercase tracking-widest opacity-70">
+                      Fallback:
+                    </span>
+                    <button
+                      onClick={() => runDemoScan(target.trim())}
+                      className="text-[10px] uppercase tracking-widest underline underline-offset-2 hover:opacity-80 transition-all"
+                    >
+                      Run demo scan offline →
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -251,6 +337,7 @@ function ScanPage() {
                 <div className="font-mono text-[11px] text-muted-foreground flex items-center gap-2">
                   <span className="size-1.5 rounded-full bg-yellow-400 animate-pulse" />
                   Validating target and establishing connector handshake…
+                  <span className="ml-auto text-[10px] opacity-60">Timeout in {Math.round(SCAN_TIMEOUT_MS / 1000)}s</span>
                 </div>
               )}
             </div>
@@ -279,12 +366,13 @@ function ScanPage() {
                 </div>
                 <div className="border-t border-border pt-6 font-mono text-[10px] uppercase tracking-widest text-muted-foreground space-y-1">
                   <div>// Hint: try a real domain — the engine simulates a connector handshake.</div>
+                  <div>// Test errors: service-down.scanr.test · network-error.scanr.test · timeout.scanr.test</div>
                 </div>
               </div>
 
               <div className="bg-card p-10">
                 <div className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground mb-4">
-                  Scan Log
+                  Scan Log {demoMode && <span className="text-yellow-400">· Demo Mode</span>}
                 </div>
                 <div ref={logRef} className="space-y-2 font-mono text-xs max-h-[420px] overflow-y-auto pr-2">
                   {feed.length === 0 && <div className="text-muted-foreground">Awaiting scan deployment…</div>}
@@ -306,6 +394,11 @@ function ScanPage() {
       </section>
     </div>
   );
+}
+
+function nowStamp(offsetMs: number) {
+  const d = new Date(Date.now() + offsetMs);
+  return d.toTimeString().slice(0, 8);
 }
 
 function Stat({ label, value, accent }: { label: string; value: number; accent: string }) {
