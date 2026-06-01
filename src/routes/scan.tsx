@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { runScan, type Finding, type Severity } from "@/lib/scan.functions";
+import { runScan, CHECKS, type Finding, type Severity } from "@/lib/scan.functions";
 
 export const Route = createFileRoute("/scan")({
   head: () => ({
