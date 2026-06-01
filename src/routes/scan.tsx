@@ -63,6 +63,7 @@ function ScanPage() {
   const [demoMode, setDemoMode] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const abortRef = useRef<AbortController | null>(null);
+  const findingsQueueRef = useRef<Finding[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
 
   const cleanup = useCallback(() => {
@@ -76,6 +77,11 @@ function ScanPage() {
     setDemoMode(true);
     setScanError(null);
     setValidationError(null);
+    findingsQueueRef.current = CHECKS.map((c) => ({
+      ...c,
+      id: crypto.randomUUID(),
+      ts: nowStamp(0),
+    }));
     setFeed([
       { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing demo scan for ${t}` },
     ]);
@@ -123,6 +129,7 @@ function ScanPage() {
         throw new Error("TIMEOUT");
       }
 
+      findingsQueueRef.current = result.findings;
       setFeed([
         { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "INIT", message: `Initializing handshake with ${result.target}` },
       ]);
@@ -144,9 +151,9 @@ function ScanPage() {
   useEffect(() => {
     if (status !== "running") return;
     let i = 0;
-    const allChecks = feed.length > 0 ? feed.slice(1) : [];
+    const queue = findingsQueueRef.current;
     const id = setInterval(() => {
-      if (i >= allChecks.length) {
+      if (i >= queue.length) {
         setFeed((f) => [
           ...f,
           { id: crypto.randomUUID(), ts: nowStamp(0), framework: "SOC 2", control: "—", severity: "DONE", message: demoMode ? "Demo scan complete · report generated" : "Scan complete · report generated" },
@@ -156,13 +163,13 @@ function ScanPage() {
         clearInterval(id);
         return;
       }
-      const c = allChecks[i];
+      const c = queue[i];
       setFeed((f) => [...f, { ...c, id: crypto.randomUUID(), ts: nowStamp(0) }]);
-      setProgress(Math.round(((i + 1) / allChecks.length) * 100));
+      setProgress(Math.round(((i + 1) / queue.length) * 100));
       i++;
     }, 420);
     return () => clearInterval(id);
-  }, [status, feed, demoMode]);
+  }, [status, demoMode]);
 
   useEffect(() => {
     logRef.current?.scrollTo({ top: logRef.current.scrollHeight, behavior: "smooth" });
@@ -203,6 +210,7 @@ function ScanPage() {
     setValidationError(null);
     setDemoMode(false);
     setRetryCount(0);
+    findingsQueueRef.current = [];
   };
 
   const sevColor: Record<Severity, string> = {
