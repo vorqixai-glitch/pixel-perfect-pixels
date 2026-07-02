@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, ScanLine } from "lucide-react";
 import { useState } from "react";
 
-export const Route = createFileRoute("/_authenticated/scans")({
+export const Route = createFileRoute("/_authenticated/scans/")({
   component: ScansPage,
 });
 

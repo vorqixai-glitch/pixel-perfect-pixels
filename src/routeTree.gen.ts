@@ -16,10 +16,10 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as FrameworksSlugRouteImport } from './routes/frameworks.$slug'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
-import { Route as AuthenticatedScansRouteImport } from './routes/_authenticated/scans'
 import { Route as AuthenticatedReportsRouteImport } from './routes/_authenticated/reports'
 import { Route as AuthenticatedFindingsRouteImport } from './routes/_authenticated/findings'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedScansIndexRouteImport } from './routes/_authenticated/scans.index'
 import { Route as AuthenticatedScansIdRouteImport } from './routes/_authenticated/scans.$id'
 
 const ScanRoute = ScanRouteImport.update({
@@ -56,11 +56,6 @@ const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
   path: '/settings',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedScansRoute = AuthenticatedScansRouteImport.update({
-  id: '/scans',
-  path: '/scans',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
 const AuthenticatedReportsRoute = AuthenticatedReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -76,10 +71,15 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedScansIndexRoute = AuthenticatedScansIndexRouteImport.update({
+  id: '/scans/',
+  path: '/scans/',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedScansIdRoute = AuthenticatedScansIdRouteImport.update({
-  id: '/$id',
-  path: '/$id',
-  getParentRoute: () => AuthenticatedScansRoute,
+  id: '/scans/$id',
+  path: '/scans/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
@@ -90,10 +90,10 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/findings': typeof AuthenticatedFindingsRoute
   '/reports': typeof AuthenticatedReportsRoute
-  '/scans': typeof AuthenticatedScansRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/frameworks/$slug': typeof FrameworksSlugRoute
   '/scans/$id': typeof AuthenticatedScansIdRoute
+  '/scans/': typeof AuthenticatedScansIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -103,10 +103,10 @@ export interface FileRoutesByTo {
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/findings': typeof AuthenticatedFindingsRoute
   '/reports': typeof AuthenticatedReportsRoute
-  '/scans': typeof AuthenticatedScansRouteWithChildren
   '/settings': typeof AuthenticatedSettingsRoute
   '/frameworks/$slug': typeof FrameworksSlugRoute
   '/scans/$id': typeof AuthenticatedScansIdRoute
+  '/scans': typeof AuthenticatedScansIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -118,10 +118,10 @@ export interface FileRoutesById {
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/findings': typeof AuthenticatedFindingsRoute
   '/_authenticated/reports': typeof AuthenticatedReportsRoute
-  '/_authenticated/scans': typeof AuthenticatedScansRouteWithChildren
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/frameworks/$slug': typeof FrameworksSlugRoute
   '/_authenticated/scans/$id': typeof AuthenticatedScansIdRoute
+  '/_authenticated/scans/': typeof AuthenticatedScansIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -133,10 +133,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/findings'
     | '/reports'
-    | '/scans'
     | '/settings'
     | '/frameworks/$slug'
     | '/scans/$id'
+    | '/scans/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -146,10 +146,10 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/findings'
     | '/reports'
-    | '/scans'
     | '/settings'
     | '/frameworks/$slug'
     | '/scans/$id'
+    | '/scans'
   id:
     | '__root__'
     | '/'
@@ -160,10 +160,10 @@ export interface FileRouteTypes {
     | '/_authenticated/dashboard'
     | '/_authenticated/findings'
     | '/_authenticated/reports'
-    | '/_authenticated/scans'
     | '/_authenticated/settings'
     | '/frameworks/$slug'
     | '/_authenticated/scans/$id'
+    | '/_authenticated/scans/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -226,13 +226,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedSettingsRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/scans': {
-      id: '/_authenticated/scans'
-      path: '/scans'
-      fullPath: '/scans'
-      preLoaderRoute: typeof AuthenticatedScansRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/reports': {
       id: '/_authenticated/reports'
       path: '/reports'
@@ -254,41 +247,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/scans/': {
+      id: '/_authenticated/scans/'
+      path: '/scans'
+      fullPath: '/scans/'
+      preLoaderRoute: typeof AuthenticatedScansIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/scans/$id': {
       id: '/_authenticated/scans/$id'
-      path: '/$id'
+      path: '/scans/$id'
       fullPath: '/scans/$id'
       preLoaderRoute: typeof AuthenticatedScansIdRouteImport
-      parentRoute: typeof AuthenticatedScansRoute
+      parentRoute: typeof AuthenticatedRouteRoute
     }
   }
 }
-
-interface AuthenticatedScansRouteChildren {
-  AuthenticatedScansIdRoute: typeof AuthenticatedScansIdRoute
-}
-
-const AuthenticatedScansRouteChildren: AuthenticatedScansRouteChildren = {
-  AuthenticatedScansIdRoute: AuthenticatedScansIdRoute,
-}
-
-const AuthenticatedScansRouteWithChildren =
-  AuthenticatedScansRoute._addFileChildren(AuthenticatedScansRouteChildren)
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedFindingsRoute: typeof AuthenticatedFindingsRoute
   AuthenticatedReportsRoute: typeof AuthenticatedReportsRoute
-  AuthenticatedScansRoute: typeof AuthenticatedScansRouteWithChildren
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedScansIdRoute: typeof AuthenticatedScansIdRoute
+  AuthenticatedScansIndexRoute: typeof AuthenticatedScansIndexRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedFindingsRoute: AuthenticatedFindingsRoute,
   AuthenticatedReportsRoute: AuthenticatedReportsRoute,
-  AuthenticatedScansRoute: AuthenticatedScansRouteWithChildren,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedScansIdRoute: AuthenticatedScansIdRoute,
+  AuthenticatedScansIndexRoute: AuthenticatedScansIndexRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
