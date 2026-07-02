@@ -40,7 +40,7 @@ function Nav() {
           <a href="#pricing" className="hover:text-primary transition-colors">Pricing</a>
           <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
         </div>
-        <Link to="/scan" className="bg-primary text-primary-foreground px-5 py-2 text-xs font-mono uppercase tracking-tighter hover:brightness-110 transition-all">
+        <Link to="/dashboard" className="bg-primary text-primary-foreground px-5 py-2 text-xs font-mono uppercase tracking-tighter hover:brightness-110 transition-all">
           Deploy Scan
         </Link>
       </div>
@@ -70,7 +70,7 @@ function Hero() {
 
 function DashboardMock() {
   return (
-    <Link to="/scan" className="block group relative animate-reveal [animation-delay:400ms] ring-1 ring-border rounded-xl overflow-hidden bg-card hover:ring-primary transition-all">
+    <Link to="/dashboard" className="block group relative animate-reveal [animation-delay:400ms] ring-1 ring-border rounded-xl overflow-hidden bg-card hover:ring-primary transition-all">
       <div className="h-10 border-b border-border px-4 flex items-center gap-3">
         <div className="flex gap-1.5">
           <div className="size-2.5 rounded-full bg-foreground/15" />
@@ -258,7 +258,7 @@ function CTA() {
         <p className="font-mono text-xs uppercase tracking-widest text-muted-foreground mt-8">
           No credit card required · SOC 2 Type II report available
         </p>
-        <Link to="/scan" className="inline-block mt-10 bg-primary text-primary-foreground font-display text-2xl px-12 py-5 uppercase tracking-widest hover:brightness-110 transition-all">
+        <Link to="/dashboard" className="inline-block mt-10 bg-primary text-primary-foreground font-display text-2xl px-12 py-5 uppercase tracking-widest hover:brightness-110 transition-all">
           Start Free Scan →
         </Link>
       </div>
@@ -275,7 +275,7 @@ function Footer() {
           <span>© 2026 Scanr Compliance Orchestration · Build 82.02.11</span>
         </div>
         <div className="flex gap-8">
-          <Link to="/scan" className="hover:text-primary transition-colors">Scan</Link>
+          <Link to="/dashboard" className="hover:text-primary transition-colors">Scan</Link>
           <Link to="/contact" className="hover:text-primary transition-colors">Contact</Link>
           <Link to="/frameworks/$slug" params={{ slug: "soc2" }} className="hover:text-primary transition-colors">Frameworks</Link>
         </div>

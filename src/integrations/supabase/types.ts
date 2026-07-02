@@ -14,6 +14,106 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_events: {
+        Row: {
+          action: string
+          created_at: string
+          id: string
+          meta: Json
+          scan_id: string | null
+          user_id: string
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          scan_id?: string | null
+          user_id: string
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          scan_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      findings: {
+        Row: {
+          assigned_to: string
+          category: string
+          confidence: number
+          created_at: string
+          description: string
+          id: string
+          notes: string
+          page_url: string
+          scan_id: string
+          severity: string
+          status: string
+          suggested_fix: string
+          title: string
+          updated_at: string
+          user_id: string
+          why_matters: string
+        }
+        Insert: {
+          assigned_to?: string
+          category: string
+          confidence?: number
+          created_at?: string
+          description?: string
+          id?: string
+          notes?: string
+          page_url: string
+          scan_id: string
+          severity: string
+          status?: string
+          suggested_fix?: string
+          title: string
+          updated_at?: string
+          user_id: string
+          why_matters?: string
+        }
+        Update: {
+          assigned_to?: string
+          category?: string
+          confidence?: number
+          created_at?: string
+          description?: string
+          id?: string
+          notes?: string
+          page_url?: string
+          scan_id?: string
+          severity?: string
+          status?: string
+          suggested_fix?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+          why_matters?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "findings_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           company: string | null
