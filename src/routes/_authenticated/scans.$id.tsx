@@ -1,12 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getDashboard, runScan } from "@/lib/scanner.functions";
+import { getDashboard, runScan, logReportExport } from "@/lib/scanner.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, Download, ExternalLink, ArrowRight } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, ArrowRight, FileSpreadsheet, FileDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FindingsTable } from "@/components/findings-table";
+import { downloadCsv, downloadPdf, type ExportFinding } from "@/lib/report-export";
+
 
 export const Route = createFileRoute("/_authenticated/scans/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
