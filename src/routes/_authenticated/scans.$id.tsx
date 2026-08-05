@@ -32,7 +32,9 @@ function ScanDetail() {
   const navigate = useNavigate({ from: Route.fullPath });
   const dash = useServerFn(getDashboard);
   const run = useServerFn(runScan);
+  const logExport = useServerFn(logReportExport);
   const qc = useQueryClient();
+
 
   const q = useQuery({
     queryKey: ["dashboard"],
