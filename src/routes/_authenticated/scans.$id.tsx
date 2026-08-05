@@ -173,8 +173,11 @@ function ScanDetail() {
           >
             <ExternalLink className="h-4 w-4" /> Visit site
           </a>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={findings.length === 0}>
-            <Download className="h-4 w-4" /> Export CSV
+          <Button variant="outline" size="sm" onClick={() => exportReport("csv")} disabled={findings.length === 0 || exporting !== null}>
+            {exporting === "csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportReport("pdf")} disabled={findings.length === 0 || exporting !== null}>
+            {exporting === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />} PDF
           </Button>
           <Button size="sm" onClick={rerun} disabled={rerunning || scanning}>
             {rerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
