@@ -114,7 +114,12 @@ export function FindingsTable({
         {filtered.map((f) => {
           const isOpen = expanded.has(f.id);
           return (
-            <li key={f.id}>
+            <li
+              key={f.id}
+              id={`finding-${f.id}`}
+              ref={(el) => { rowRefs.current[f.id] = el; }}
+              className={focusId === f.id ? "bg-primary/5 ring-1 ring-inset ring-primary/40" : undefined}
+            >
               <button
                 type="button"
                 onClick={() => toggle(f.id)}
