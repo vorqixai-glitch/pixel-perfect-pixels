@@ -41,7 +41,7 @@ const CATEGORY_CODE: Record<string, string> = {
 const SEVERITY_RANK: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
 /** Stable, human-readable identifier used in exported reports and audit trails. */
-export function internalId(f: ExportFinding): string {
+export function internalId(f: { id: string; category: string }): string {
   const code = CATEGORY_CODE[f.category] || f.category.slice(0, 3).toUpperCase();
   return `CSR-${code}-${f.id.replace(/-/g, "").slice(0, 8).toUpperCase()}`;
 }
