@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { updateFinding } from "@/lib/scanner.functions";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { internalId } from "@/lib/report-export";
 
 
 type Finding = {
