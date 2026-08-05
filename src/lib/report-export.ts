@@ -192,8 +192,8 @@ export async function downloadPdf(
       0: { cellWidth: 100, fontStyle: "bold" },
       1: { cellWidth: 46, halign: "center", fontStyle: "bold" },
       2: { cellWidth: 138 },
-      3: { cellWidth: 238 },
-      4: { cellWidth: 238 },
+      3: { cellWidth: 237 },
+      4: { cellWidth: 237 },
     },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 1) {
