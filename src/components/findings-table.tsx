@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { updateFinding } from "@/lib/scanner.functions";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronRight, X } from "lucide-react";
+import { internalId } from "@/lib/report-export";
 
 
 type Finding = {
@@ -136,7 +137,9 @@ export function FindingsTable({
               {isOpen && (
                 <div className="grid gap-4 border-t border-border bg-muted/10 px-6 py-4 md:grid-cols-2">
                   <div>
-                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Description</div>
+                    <div className="text-xs uppercase tracking-wide text-muted-foreground">Internal ID</div>
+                    <p className="mt-1 font-mono text-xs">{internalId(f)}</p>
+                    <div className="mt-4 text-xs uppercase tracking-wide text-muted-foreground">Description</div>
                     <p className="mt-1 text-sm">{f.description}</p>
                     <div className="mt-4 text-xs uppercase tracking-wide text-muted-foreground">Why it matters</div>
                     <p className="mt-1 text-sm">{f.why_matters}</p>

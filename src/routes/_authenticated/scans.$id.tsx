@@ -1,12 +1,14 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { getDashboard, runScan } from "@/lib/scanner.functions";
+import { getDashboard, runScan, logReportExport } from "@/lib/scanner.functions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Loader2, RefreshCw, Download, ExternalLink, ArrowRight } from "lucide-react";
+import { Loader2, RefreshCw, ExternalLink, ArrowRight, FileSpreadsheet, FileDown } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FindingsTable } from "@/components/findings-table";
+import { downloadCsv, downloadPdf, type ExportFinding } from "@/lib/report-export";
+
 
 export const Route = createFileRoute("/_authenticated/scans/$id")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -30,7 +32,9 @@ function ScanDetail() {
   const navigate = useNavigate({ from: Route.fullPath });
   const dash = useServerFn(getDashboard);
   const run = useServerFn(runScan);
+  const logExport = useServerFn(logReportExport);
   const qc = useQueryClient();
+
 
   const q = useQuery({
     queryKey: ["dashboard"],
@@ -47,6 +51,7 @@ function ScanDetail() {
   });
 
   const [rerunning, setRerunning] = useState(false);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
 
   const scan = q.data?.scans.find((s) => s.id === id);
   const findings = useMemo(() => (q.data?.findings || []).filter((f) => f.scan_id === id), [q.data, id]);
@@ -96,22 +101,32 @@ function ScanDetail() {
     }
   }
 
-  function exportCsv() {
-    const rows = [
-      ["Title", "Category", "Severity", "Page", "Status", "Confidence", "Why it matters", "Suggested fix"],
-      ...findings.map((f) => [
-        f.title, f.category, f.severity, f.page_url, f.status, String(f.confidence), f.why_matters, f.suggested_fix,
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `scan-${id}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+  async function exportReport(format: "csv" | "pdf") {
+    setExporting(format);
+    try {
+      const rows = findings as unknown as ExportFinding[];
+      const scope = scan?.target || id;
+      const base = `security-issues-${scope.replace(/^https?:\/\//, "").replace(/[^a-z0-9]+/gi, "-").slice(0, 50)}-${Date.now()}`;
+      if (format === "csv") {
+        downloadCsv(rows, scope, `${base}.csv`);
+      } else {
+        await downloadPdf(
+          rows,
+          scan ? { target: scan.target, framework: scan.framework, score: Number(scan.score) } : null,
+          scope,
+          `${base}.pdf`,
+        );
+      }
+      try {
+        await logExport({ data: { scanId: id, format, scope, findings: rows.length } });
+      } catch {
+        /* export already delivered; audit logging is best-effort */
+      }
+    } finally {
+      setExporting(null);
+    }
   }
+
 
   if (q.isLoading) return <div className="p-10 text-sm text-muted-foreground">Loading…</div>;
   if (!scan) return <div className="p-10 text-sm text-muted-foreground">Scan not found. <Link to="/scans" className="underline">Back</Link></div>;
@@ -158,8 +173,11 @@ function ScanDetail() {
           >
             <ExternalLink className="h-4 w-4" /> Visit site
           </a>
-          <Button variant="outline" size="sm" onClick={exportCsv} disabled={findings.length === 0}>
-            <Download className="h-4 w-4" /> Export CSV
+          <Button variant="outline" size="sm" onClick={() => exportReport("csv")} disabled={findings.length === 0 || exporting !== null}>
+            {exporting === "csv" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSpreadsheet className="h-4 w-4" />} CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => exportReport("pdf")} disabled={findings.length === 0 || exporting !== null}>
+            {exporting === "pdf" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileDown className="h-4 w-4" />} PDF
           </Button>
           <Button size="sm" onClick={rerun} disabled={rerunning || scanning}>
             {rerunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
