@@ -188,11 +188,11 @@ export async function downloadPdf(
     styles: { fontSize: 7.5, cellPadding: 4, valign: "top", overflow: "linebreak" },
     headStyles: { fillColor: [17, 17, 17], textColor: 255, fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 92, fontStyle: "bold" },
-      1: { cellWidth: 52, halign: "center", fontStyle: "bold" },
-      2: { cellWidth: 150 },
-      3: { cellWidth: 250 },
-      4: { cellWidth: 250 },
+      0: { cellWidth: 86, fontStyle: "bold" },
+      1: { cellWidth: 48, halign: "center", fontStyle: "bold" },
+      2: { cellWidth: 148 },
+      3: { cellWidth: 240 },
+      4: { cellWidth: 240 },
     },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 1) {
