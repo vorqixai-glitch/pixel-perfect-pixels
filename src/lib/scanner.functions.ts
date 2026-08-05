@@ -172,7 +172,29 @@ export const updateFinding = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const logReportExport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: unknown) =>
+    z.object({
+      scanId: z.string().uuid().nullable().optional(),
+      format: z.enum(["csv", "pdf", "markdown"]),
+      scope: z.string().max(300),
+      findings: z.number().int().nonnegative(),
+    }).parse(d),
+  )
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    await supabase.from("audit_events").insert({
+      user_id: userId,
+      scan_id: data.scanId ?? null,
+      action: "report.exported",
+      meta: { format: data.format, scope: data.scope, findings: data.findings },
+    });
+    return { ok: true };
+  });
+
 export const getDashboard = createServerFn({ method: "POST" })
+
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase } = context;
