@@ -51,6 +51,7 @@ function ScanDetail() {
   });
 
   const [rerunning, setRerunning] = useState(false);
+  const [exporting, setExporting] = useState<"csv" | "pdf" | null>(null);
 
   const scan = q.data?.scans.find((s) => s.id === id);
   const findings = useMemo(() => (q.data?.findings || []).filter((f) => f.scan_id === id), [q.data, id]);
