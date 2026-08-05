@@ -185,14 +185,15 @@ export async function downloadPdf(
       evidenceText(f).replace(/ \| /g, "\n"),
       resolutionText(f).replace(/ \| /g, "\n"),
     ]),
+    rowPageBreak: "avoid",
     styles: { fontSize: 7.5, cellPadding: 4, valign: "top", overflow: "linebreak" },
     headStyles: { fillColor: [17, 17, 17], textColor: 255, fontStyle: "bold" },
     columnStyles: {
-      0: { cellWidth: 86, fontStyle: "bold" },
-      1: { cellWidth: 48, halign: "center", fontStyle: "bold" },
-      2: { cellWidth: 148 },
-      3: { cellWidth: 240 },
-      4: { cellWidth: 240 },
+      0: { cellWidth: 100, fontStyle: "bold" },
+      1: { cellWidth: 46, halign: "center", fontStyle: "bold" },
+      2: { cellWidth: 138 },
+      3: { cellWidth: 238 },
+      4: { cellWidth: 238 },
     },
     didParseCell: (data) => {
       if (data.section === "body" && data.column.index === 1) {
