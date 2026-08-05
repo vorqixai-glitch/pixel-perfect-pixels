@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import { updateFinding } from "@/lib/scanner.functions";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, X } from "lucide-react";
+
 
 type Finding = {
   id: string;
@@ -32,20 +33,42 @@ const STATUS_COLORS: Record<string, string> = {
   ignored: "bg-muted/40 text-muted-foreground",
 };
 
-export function FindingsTable({ findings }: { findings: Finding[] }) {
+export function FindingsTable({
+  findings,
+  focusId,
+  pageFilter,
+  onClearPageFilter,
+}: {
+  findings: Finding[];
+  focusId?: string;
+  pageFilter?: string;
+  onClearPageFilter?: () => void;
+}) {
   const [severity, setSeverity] = useState<string>("all");
   const [status, setStatus] = useState<string>("all");
   const [category, setCategory] = useState<string>("all");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const upd = useServerFn(updateFinding);
   const qc = useQueryClient();
+  const rowRefs = useRef<Record<string, HTMLLIElement | null>>({});
+
+  useEffect(() => {
+    if (!focusId) return;
+    setSeverity("all");
+    setStatus("all");
+    setCategory("all");
+    setExpanded((prev) => new Set(prev).add(focusId));
+    const el = rowRefs.current[focusId];
+    if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [focusId, findings.length]);
 
   const categories = Array.from(new Set(findings.map((f) => f.category)));
 
   const filtered = findings.filter((f) =>
     (severity === "all" || f.severity === severity) &&
     (status === "all" || f.status === status) &&
-    (category === "all" || f.category === category),
+    (category === "all" || f.category === category) &&
+    (!pageFilter || f.page_url === pageFilter),
   );
 
   async function setStatusOn(id: string, newStatus: string) {
@@ -74,13 +97,29 @@ export function FindingsTable({ findings }: { findings: Finding[] }) {
         <Filter label="Severity" value={severity} onChange={setSeverity} options={["all", "critical", "high", "medium", "low"]} />
         <Filter label="Status" value={status} onChange={setStatus} options={["all", "open", "resolved", "ignored"]} />
         <Filter label="Category" value={category} onChange={setCategory} options={["all", ...categories]} />
+        {pageFilter && (
+          <button
+            type="button"
+            onClick={onClearPageFilter}
+            className="inline-flex max-w-[320px] items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-1 text-xs text-foreground"
+          >
+            <span className="truncate">Page: {pageFilter}</span>
+            <X className="h-3 w-3 shrink-0" />
+          </button>
+        )}
         <span className="ml-auto text-xs text-muted-foreground">{filtered.length} of {findings.length}</span>
       </div>
+
       <ul className="divide-y divide-border">
         {filtered.map((f) => {
           const isOpen = expanded.has(f.id);
           return (
-            <li key={f.id}>
+            <li
+              key={f.id}
+              id={`finding-${f.id}`}
+              ref={(el) => { rowRefs.current[f.id] = el; }}
+              className={focusId === f.id ? "bg-primary/5 ring-1 ring-inset ring-primary/40" : undefined}
+            >
               <button
                 type="button"
                 onClick={() => toggle(f.id)}
